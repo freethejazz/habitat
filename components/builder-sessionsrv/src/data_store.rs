@@ -14,7 +14,8 @@
 
 use std::sync::Arc;
 
-use dbcache::{self, data_store, Bucket, ConnectionPool, ExpiringSet, IndexSet, InstaSet};
+use dbcache;
+use dbcache::data_store::*;
 use protocol::sessionsrv;
 
 use config::Config;
@@ -23,20 +24,24 @@ use error::Result;
 pub struct DataStore {
     pub pool: Arc<ConnectionPool>,
     pub accounts: AccountTable,
+    pub features: FeatureFlagsIndices,
     pub sessions: SessionTable,
 }
 
-impl data_store::Pool for DataStore {
+impl Pool for DataStore {
     type Config = Config;
 
     fn init(pool: Arc<ConnectionPool>) -> Self {
         let pool1 = pool.clone();
         let pool2 = pool.clone();
+        let pool3 = pool.clone();
         let accounts = AccountTable::new(pool1);
         let sessions = SessionTable::new(pool2);
+        let features = FeatureFlagsIndices::new(pool3);
         DataStore {
             pool: pool,
             accounts: accounts,
+            features: features,
             sessions: sessions,
         }
     }
@@ -106,6 +111,42 @@ impl InstaSet for AccountTable {
     }
 }
 
+pub struct FeatureFlagsIndices {
+    pub github: GitHub2FeatureFlagIdx,
+}
+
+impl FeatureFlagsIndices {
+    pub fn new(pool: Arc<ConnectionPool>) -> Self {
+        let github = GitHub2FeatureFlagIdx::new(pool);
+        FeatureFlagsIndices { github: github }
+    }
+}
+
+pub struct GitHub2FeatureFlagIdx {
+    pool: Arc<ConnectionPool>,
+}
+
+impl GitHub2FeatureFlagIdx {
+    pub fn new(pool: Arc<ConnectionPool>) -> Self {
+        GitHub2FeatureFlagIdx { pool: pool }
+    }
+}
+
+impl Bucket for GitHub2FeatureFlagIdx {
+    fn prefix() -> &'static str {
+        "github2feature_flag"
+    }
+
+    fn pool(&self) -> &ConnectionPool {
+        &self.pool
+    }
+}
+
+impl IndexSet for GitHub2FeatureFlagIdx {
+    type Key = u64;
+    type Value = u32;
+}
+
 pub struct SessionTable {
     pool: Arc<ConnectionPool>,
 }
@@ -159,8 +200,6 @@ impl IndexSet for GitHub2AccountIdx {
     type Value = u64;
 }
 
-
-/// maps github usernames -> Account.id's
 struct GitHubUser2AccountIdx {
     pool: Arc<ConnectionPool>,
 }

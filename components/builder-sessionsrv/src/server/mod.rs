@@ -17,10 +17,10 @@ pub mod handlers;
 use std::ops::Deref;
 use std::sync::{Arc, RwLock};
 
-use dbcache::{ExpiringSet, InstaSet, IndexSet};
 use dbcache::data_store::Pool;
 use hab_net::{Application, Supervisor};
 use hab_net::dispatcher::prelude::*;
+use hab_net::oauth::github::GitHubClient;
 use hab_net::server::{Envelope, NetIdent, RouteConn, Service, ZMQ_CONTEXT};
 use protocol::net;
 use zmq;
@@ -34,12 +34,14 @@ const BE_LISTEN_ADDR: &'static str = "inproc://backend";
 #[derive(Clone)]
 pub struct ServerState {
     datastore: Arc<Box<DataStore>>,
+    github: Arc<Box<GitHubClient>>,
 }
 
 impl ServerState {
-    pub fn new(datastore: DataStore) -> Self {
+    pub fn new(datastore: DataStore, gh: GitHubClient) -> Self {
         ServerState {
             datastore: Arc::new(Box::new(datastore)),
+            github: Arc::new(Box::new(gh)),
         }
     }
 }
@@ -71,6 +73,9 @@ impl Dispatcher for Worker {
                 -> Result<()> {
         match message.message_id() {
             "AccountGet" => handlers::account_get(message, sock, state),
+            "AccountSearch" => handlers::account_search(message, sock, state),
+            "GrantFlagToOrgs" => handlers::grant_flags(message, sock, state),
+            "ListFlagGrants" => handlers::grant_list(message, sock, state),
             "SessionCreate" => handlers::session_create(message, sock, state),
             "SessionGet" => handlers::session_get(message, sock, state),
             _ => panic!("unhandled message"),
@@ -124,8 +129,12 @@ impl Application for Server {
             let cfg = self.config.read().unwrap();
             DataStore::start(cfg.deref())
         };
+        let gh = {
+            let cfg = self.config.read().unwrap();
+            GitHubClient::new(cfg.deref())
+        };
         let cfg = self.config.clone();
-        let init_state = ServerState::new(datastore);
+        let init_state = ServerState::new(datastore, gh);
         let sup: Supervisor<Worker> = Supervisor::new(cfg, init_state);
         try!(sup.start());
         try!(self.connect());

@@ -17,7 +17,8 @@ use std::net;
 
 use dbcache::config::DataStoreCfg;
 use hab_core::config::{ConfigFile, ParseInto};
-use hab_net::config::{DispatcherCfg, RouteAddrs, Shards};
+use hab_net::config::{DispatcherCfg, GitHubOAuth, RouteAddrs, Shards, DEFAULT_GITHUB_URL,
+                      DEV_GITHUB_CLIENT_ID, DEV_GITHUB_CLIENT_SECRET};
 use protocol::sharding::{ShardId, SHARD_COUNT};
 use redis;
 use toml;
@@ -39,6 +40,12 @@ pub struct Config {
     pub shards: Vec<ShardId>,
     /// Number of threads to process queued messages.
     pub worker_threads: usize,
+    /// URL to GitHub API
+    pub github_url: String,
+    /// Client identifier used for GitHub API requests
+    pub github_client_id: String,
+    /// Client secret used for GitHub API requests
+    pub github_client_secret: String,
 }
 
 impl Default for Config {
@@ -51,6 +58,9 @@ impl Default for Config {
             heartbeat_port: 5563,
             shards: (0..SHARD_COUNT).collect(),
             worker_threads: Self::default_worker_count(),
+            github_url: DEFAULT_GITHUB_URL.to_string(),
+            github_client_id: DEV_GITHUB_CLIENT_ID.to_string(),
+            github_client_secret: DEV_GITHUB_CLIENT_SECRET.to_string(),
         }
     }
 }
@@ -88,6 +98,20 @@ impl DataStoreCfg for Config {
 impl DispatcherCfg for Config {
     fn worker_count(&self) -> usize {
         self.worker_threads
+    }
+}
+
+impl GitHubOAuth for Config {
+    fn github_url(&self) -> &str {
+        &self.github_url
+    }
+
+    fn github_client_id(&self) -> &str {
+        &self.github_client_id
+    }
+
+    fn github_client_secret(&self) -> &str {
+        &self.github_client_secret
     }
 }
 

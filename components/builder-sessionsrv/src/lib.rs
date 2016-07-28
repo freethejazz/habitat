@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[macro_use]
+extern crate bitflags;
 extern crate habitat_builder_dbcache as dbcache;
 extern crate habitat_builder_protocol as protocol;
 extern crate habitat_core as hab_core;
@@ -30,6 +32,7 @@ extern crate zmq;
 pub mod config;
 pub mod data_store;
 pub mod error;
+pub mod privilege;
 pub mod server;
 
 pub use self::config::Config;
