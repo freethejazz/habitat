@@ -153,6 +153,7 @@ export const addProject = projectActions.addProject;
 export const fetchBuilds = projectActions.fetchBuilds;
 export const fetchProject = projectActions.fetchProject;
 export const fetchProjects = projectActions.fetchProjects;
+export const fetchProjectsForPackages = projectActions.fetchProjectsForPackages;
 export const populateBuildLog = projectActions.populateBuildLog;
 export const setCurrentProject = projectActions.setCurrentProject;
 export const deleteProject = projectActions.deleteProject;

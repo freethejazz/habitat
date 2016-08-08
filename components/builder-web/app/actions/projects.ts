@@ -34,10 +34,10 @@ export const SET_CURRENT_PROJECT = "SET_CURRENT_PROJECT";
 export const SET_PROJECTS = "SET_PROJECTS";
 export const DELETE_PROJECT = "DELETE_PROJECT";
 
-export function addProject(project: Object, token: string) {
+export function addProject(project: Object, token: string, route: Array<String>) {
     return dispatch => {
         new BuilderApiClient(token).createProject(project).then(response => {
-            dispatch(requestRoute(["Projects"]));
+            dispatch(requestRoute(route));
             dispatch(addNotification({
                 title: "Project created",
                 body: `Created ${response["id"]}.`,
@@ -89,7 +89,7 @@ function fetchBuildLog(pkg, builds) {
     };
 }
 
-export function fetchProject(id: string, token: string) {
+export function fetchProject(id: string, token: string, alert: boolean) {
     return dispatch => {
         new BuilderApiClient(token).getProject(id).then(response => {
             dispatch(
@@ -99,13 +99,25 @@ export function fetchProject(id: string, token: string) {
                 }, response)
               )
             );
+            dispatch(populateProject(response));
         }).catch(error => {
-            dispatch(addNotification({
-                title: "Failed to fetch project",
-                body: error.message,
-                type: DANGER,
-            }));
+            if (alert) {
+              dispatch(addNotification({
+                  title: "Failed to fetch project",
+                  body: error.message,
+                  type: DANGER,
+              }));
+            }
         });
+    };
+}
+
+export function fetchProjectsForPackages(packages: Array<Object>, token: string) {
+    return dispatch => {
+        for (let pkg of packages) {
+            let id = `${pkg["origin"]}/${pkg["name"]}`;
+            dispatch(fetchProject(id, token, false));
+        }
     };
 }
 

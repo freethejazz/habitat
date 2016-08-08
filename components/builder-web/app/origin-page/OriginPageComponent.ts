@@ -18,7 +18,7 @@ import {AppStore} from "../AppStore";
 import {fetchOrigin, fetchOriginInvitations, fetchOriginMembers,
     fetchOriginPublicKeys, inviteUserToOrigin, setCurrentOriginAddingPublicKey,
     setCurrentOriginAddingPrivateKey, uploadOriginPrivateKey,
-    uploadOriginPublicKey} from "../actions/index";
+    uploadOriginPublicKey, filterPackagesBy, fetchProjectsForPackages} from "../actions/index";
 import config from "../config";
 import {KeyAddFormComponent} from "./KeyAddFormComponent";
 import {KeyListComponent} from "./KeyListComponent";
@@ -27,10 +27,12 @@ import {OriginMembersTabComponent} from "./OriginMembersTabComponent";
 import {TabComponent} from "../TabComponent";
 import {TabsComponent} from "../TabsComponent";
 import {requireSignIn} from "../util";
+import {PackagesListComponent} from "../packages-list/PackagesListComponent";
 
 @Component({
     directives: [KeyAddFormComponent, KeyListComponent,
-        OriginMembersTabComponent, RouterLink, TabsComponent, TabComponent],
+                 OriginMembersTabComponent, RouterLink, TabsComponent, TabComponent,
+                PackagesListComponent],
     template: `
     <div class="hab-origin">
         <div class="page-title">
@@ -50,6 +52,61 @@ import {requireSignIn} from "../util";
             </p>
         </div>
         <tabs *ngIf="ui.exists && !ui.loading">
+            <tab tabTitle="Packages">
+              <div class="page-body has-sidebar">
+                <div class="hab-origin--left hab-origin--pkg-list">
+                  <div *ngIf="noPackages">
+                      <p>
+                          No packages found.
+                          <span *ngIf="packagesUi.errorMessage">
+                              Error: {{packagesUi.errorMessage}}
+                          </span>
+                      </p>
+                  </div>
+
+                  <div *ngIf="!noPackages">
+                    <div class="pkg-container">
+                        <div class="pkg-col-1">Package Name</div>
+                        <div class="pkg-col-2">Build Settings</div>
+                        <div class="pkg-col-3">Versions</div>
+                    </div>
+
+                    <div *ngFor="#pkg of packages" class="pkg-container">
+                      <div class="pkg-col-1">
+                        <a [routerLink]="['Package', { origin: pkg.origin,
+                                                         name: pkg.name,
+                                                      version: pkg.version,
+                                                      release: pkg.release }]">
+                          <h3>{{pkg.name}}</h3>
+                        </a>
+                      </div>
+                      <div class="pkg-col-2">
+                        <a [routerLink]="['Project', { origin: pkg.origin,
+                                                         name: pkg.name }]"
+                                     *ngIf="projectExistsForPackage(pkg)">
+                          Settings
+                        </a>
+                        <a [routerLink]="['ProjectCreate']" *ngIf="!projectExistsForPackage(pkg)">
+                          Link to Repo
+                        </a>
+                      </div>
+                      <div class="pkg-col-3">
+                        <a [routerLink]="['PackagesForOriginAndName', { origin: pkg.origin,
+                                                                          name: pkg.name }]">
+                          Versions
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="hab-origin--right hab-origin--pkg-list">
+                  <p>An <b>origin</b> defines packages that are conceptually related to each other.</p>
+                  <p>Automated package builds are enabled once your package has been connected to a GitHub repo that contains a Habitat plan file.</p>
+                  <p>You can either <a href="#">upload your packages to the depot</a> and connect them afterwards or connect a repo now and upload your packages later.</p>
+                  <p>Read the docs for more information on <a href="#">origins</a>, <a href="#">packages</a>, and the <a href="#">build service</a>.</p>
+                </div>
+              </div>
+            </tab>
             <tab tabTitle="Keys">
                 <div class="page-body">
                     <div class="hab-origin--left">
@@ -183,6 +240,10 @@ export class OriginPageComponent implements OnInit {
         return this.store.getState().origins.currentPublicKeys;
     }
 
+    get source() {
+        return "origin";
+    }
+
     // Initially set up the origin to be whatever comes from the params,
     // so we can query for it. In `ngOnInit`, we'll
     // populate more data by dispatching `fetchOrigin`.
@@ -203,6 +264,18 @@ export class OriginPageComponent implements OnInit {
         return this.store.getState().origins.ui.current;
     }
 
+    get packagesUi() {
+        return this.store.getState().packages.ui.visible;
+    }
+
+    get packages() {
+        return this.store.getState().packages.visible;
+    }
+
+    get noPackages() {
+        return (!this.packagesUi.exists || this.packages.size === 0) && !this.packagesUi.loading;
+    }
+
     private setOriginAddingPrivateKey(state: boolean) {
         this.store.dispatch(setCurrentOriginAddingPrivateKey(state));
         return false;
@@ -211,6 +284,14 @@ export class OriginPageComponent implements OnInit {
     private setOriginAddingPublicKey(state: boolean) {
         this.store.dispatch(setCurrentOriginAddingPublicKey(state));
         return false;
+    }
+
+    private projectId(p) {
+        return `${p["origin"]}/${p["name"]}`;
+    }
+
+    private projectExistsForPackage(p) {
+        return this.store.getState().projects.added.find(proj => { return proj["id"] === this.projectId(p); });
     }
 
     public ngOnInit() {
@@ -224,6 +305,9 @@ export class OriginPageComponent implements OnInit {
         ));
         this.store.dispatch(fetchOriginInvitations(
             this.origin.name, this.gitHubAuthToken
+        ));
+        this.store.dispatch(filterPackagesBy(
+            {origin: this.origin.name}, "", 0, true, this.gitHubAuthToken
         ));
     }
 }
